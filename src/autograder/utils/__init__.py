@@ -133,8 +133,8 @@ def prepare_for_canvas_upload(submissions_data, section, assignment_name):
         canvas_df = pd.DataFrame(
             {
                 "Student": df["S_NAME"],
-                "ID": df["SID"],
-                "SIS User ID": "",  # To be filled if available
+                "ID": "",
+                "SIS User ID": df["SID"],
                 "SIS Login ID": "",  # To be filled if available
                 "Section": section,
                 "Assignment": df["PERCENTAGE_GRADE"],
