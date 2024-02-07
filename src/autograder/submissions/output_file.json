@@ -24,10 +24,10 @@
         "\n# Convolutional Neural Network for Image Classification\n\nimport tensorflow as tf\nfrom tensorflow.keras import layers, models\nfrom tensorflow.keras.datasets import cifar10\nfrom tensorflow.keras.utils import to_categorical\n\n# Load and prepare the CIFAR-10 dataset\n(train_images, train_labels), (test_images, test_labels) = cifar10.load_data()\ntrain_images, test_images = train_images / 255.0, test_images / 255.0\ntrain_labels = to_categorical(train_labels)\ntest_labels = to_categorical(test_labels)\n\n# Define the CNN model\nmodel = models.Sequential()\nmodel.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)))\nmodel.add(layers.MaxPooling2D((2, 2)))\nmodel.add(layers.Conv2D(64, (3, 3), activation='relu'))\nmodel.add(layers.MaxPooling2D((2, 2)))\nmodel.add(layers.Conv2D(64, (3, 3), activation='relu'))\nmodel.add(layers.Flatten())\nmodel.add(layers.Dense(64, activation='relu'))\nmodel.add(layers.Dense(10, activation='softmax'))\n\n# Compile and train the model\nmodel.compile(optimizer='adam',\n              loss='categorical_crossentropy',\n              metrics=['accuracy'])\nmodel.fit(train_images, train_labels, epochs=10, validation_data=(test_images, test_labels))\n\n# Evaluate the model\ntest_loss, test_acc = model.evaluate(test_images, test_labels)\nprint(f\"Test accuracy: {test_acc * 100:.2f}%\")\n"
     ],
     "PERCENTAGE_GRADE": [
-        73.212214925303,
-        93.73434648319255,
-        88.30498985242815,
-        84.01261005776098
+        82.27276379958005,
+        84.80534028553109,
+        89.97444115057533,
+        82.05148423625522
     ],
     "COMMENTS": [
         "Random comment for Student ID: U101",
