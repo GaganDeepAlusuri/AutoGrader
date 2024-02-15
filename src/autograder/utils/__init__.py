@@ -4,18 +4,29 @@ import pandas as pd
 from src.autograder.logging import logger
 import re
 import random
+import numpy as np
 
 
+# Helper functions
 def read_file_content(file_path):
     """Reads and returns the content of a file."""
     with open(file_path, "r", encoding="utf-8") as file:
         return file.read()
 
 
+def find_csv_filename(directory):
+    directory = directory.strip('"')
+    for file in os.listdir(directory):
+        if file.endswith(".csv"):
+            return os.path.join(directory, file)
+    logger.warning("No CSV file found in the directory.")
+    return None
+
+
 # F1
 def process_submissions(folder_path):
     """
-    Processes student submissions in a given folder.
+    Processes student submissions in a given folder based on the new file naming convention.
 
     Args:
     folder_path (str): Path to the folder containing student submissions.
@@ -30,16 +41,15 @@ def process_submissions(folder_path):
     # Initialize dictionary to store submission data
     submissions_dict = {"SID": [], "S_NAME": [], "RAW_FILE": [], "PROCESSED_FILE": []}
 
-    pattern = r"U(\d+)_(\w+)\."
+    # Pattern to match the file naming convention: studentname_ID_SomeOtherID_NameofTheFile
+    pattern = r"(.+)_(\d+)_\w+_(.+)\."
 
     for filename in os.listdir(folder_path):
         if filename.endswith(".py") or filename.endswith(".ipynb"):
             match = re.match(pattern, filename)
             if match:
-                student_id = "U" + match.group(1)
-                student_name = match.group(2).lstrip(
-                    "_"
-                )  # Assuming names start with '_'
+                student_name = match.group(1)  # Extract student name
+                student_id = match.group(2)  # Extract student ID as SID
 
                 original_file_path = os.path.join(folder_path, filename)
                 raw_content = original_file_path  # Store the path to the original file
@@ -49,15 +59,17 @@ def process_submissions(folder_path):
                     processed_content = read_file_content(original_file_path)
                 elif filename.endswith(".ipynb"):
                     try:
-                        notebook_content = nbformat.reads(
-                            read_file_content(original_file_path), as_version=4
+                        notebook_content = nbformat.read(
+                            open(original_file_path, "r", encoding="utf-8"),
+                            as_version=4,
                         )
                         python_code = ""
-                        for cell in notebook_content.cells:
-                            if cell.cell_type == "code":
-                                python_code += cell.source + "\n\n"
-                            elif cell.cell_type == "markdown":
-                                markdown_lines = cell.source.split("\n")
+                        for cell in notebook_content["cells"]:
+                            if cell["cell_type"] == "code":
+                                python_code += cell["source"] + "\n\n"
+                            elif cell["cell_type"] == "markdown":
+                                # Comment out Markdown content
+                                markdown_lines = cell["source"].split("\n")
                                 for line in markdown_lines:
                                     if line.strip():
                                         python_code += f"# {line}\n"
@@ -66,7 +78,9 @@ def process_submissions(folder_path):
                         logger.error(f"Error processing {original_file_path}: {e}")
 
                 submissions_dict["SID"].append(student_id)
-                submissions_dict["S_NAME"].append(student_name)
+                submissions_dict["S_NAME"].append(
+                    student_name.replace("_", " ")
+                )  # Replace underscores with spaces in names
                 submissions_dict["RAW_FILE"].append(raw_content)
                 submissions_dict["PROCESSED_FILE"].append(processed_content)
 
@@ -78,36 +92,73 @@ def process_submissions(folder_path):
 
 
 # F2
-def add_grades_and_comments(submissions_dict):
-    """
-    Adds percentage grades and comments to the submission data.
+def add_grades_and_comments(submissions_dict, directory_path):
+    csv_file_path = find_csv_filename(directory_path)
+    if not csv_file_path:
+        logger.error("CSV file not found in the specified directory.")
+        return
 
-    Args:
-    submissions_dict (dict): Dictionary containing submission data.
+    try:
+        # Read the CSV with no header to manipulate rows separately
+        full_data = pd.read_csv(csv_file_path, header=None)
+        headers = full_data.iloc[:3]  # First three rows as headers
+        data = full_data.iloc[3:]  # Rest of the data
+        logger.info(f"Gradebook loaded successfully from {csv_file_path}.")
+    except Exception as e:
+        logger.error(f"Failed to load the gradebook CSV: {e}")
+        return
 
-    Returns:
-    dict: Dictionary with added 'PERCENTAGE_GRADE' and 'COMMENTS' columns.
-    """
-    # Initialize the modified dictionary with additional columns
-    modified_submissions_dict = submissions_dict.copy()
-    modified_submissions_dict["PERCENTAGE_GRADE"] = []
-    modified_submissions_dict["COMMENTS"] = []
+    # Check the correct name for the 'ID' column in the first row of headers
+    id_column_index = (
+        headers.iloc[0]
+        .tolist()
+        .index(next(col for col in headers.iloc[0] if "ID" in col))
+    )
 
-    for i in range(len(submissions_dict["SID"])):
-        percentage_grade = random.uniform(
-            60, 100
-        )  # Generate a random percentage grade between 60 and 100
-        comments = f"Random comment for Student ID: {submissions_dict['SID'][i]}"  # Generate a unique comment
+    assignment_name = "Big Data 101"
+    possible_points = 20
 
-        modified_submissions_dict["PERCENTAGE_GRADE"].append(percentage_grade)
-        modified_submissions_dict["COMMENTS"].append(comments)
-
-        # Log the information for each student
-        logger.info(
-            f"Student ID: {submissions_dict['SID'][i]}, Percentage Grade: {percentage_grade}, Comments: {comments}"
+    # Find the index for the first "(read only)" column in the third header row
+    read_only_col_index = (
+        headers.iloc[2]
+        .tolist()
+        .index(
+            next(col for col in headers.iloc[2] if "(read only)" in str(col).lower())
         )
+    )
 
-    return modified_submissions_dict
+    # Insert the new assignment and possible points at the correct position
+    headers.insert(read_only_col_index, assignment_name, ["", "", possible_points])
+    data.insert(
+        read_only_col_index,
+        assignment_name,
+        [random.randint(0, possible_points) for _ in range(len(data))],
+    )
+
+    # Assign grades based on the 'ID' column, ensuring all students are included
+    for index, row in data.iterrows():
+        sid = row[id_column_index]
+        # Assign random marks only if SID matches from submissions_dict
+        if str(sid) in submissions_dict:
+            data.at[index, assignment_name] = submissions_dict[str(sid)]
+        else:
+            # If not in submissions_dict, leave the random value already assigned
+            continue
+
+    # Combine the header and data for saving
+    updated_gradebook_df = pd.concat([headers, data], ignore_index=True)
+    # Set the assignment name as the column name for the newly inserted assignment column
+    updated_gradebook_df.iloc[0, read_only_col_index] = assignment_name
+
+    # Save the updated gradebook
+    updated_gradebook_path = csv_file_path.replace(".csv", "_updated.csv")
+    try:
+        updated_gradebook_df.to_csv(updated_gradebook_path, index=False, header=False)
+        logger.info(
+            f"Updated gradebook with '{assignment_name}' saved to {updated_gradebook_path}."
+        )
+    except Exception as e:
+        logger.error(f"Failed to save the updated gradebook: {e}")
 
 
 # F3

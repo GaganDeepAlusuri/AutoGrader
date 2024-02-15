@@ -8,12 +8,14 @@ import json
 
 if __name__ == "__main__":
     folder_path = input("Enter the path to the folder containing student submissions: ")
+    gradebook_path = input("Enter the path to the folder containing the Gradebook: ")
     submissions_dict = process_submissions(folder_path)
+    print(submissions_dict)
 
     # Add percentage grades and comments
-    modified_submissions_dict = add_grades_and_comments(submissions_dict)
+    add_grades_and_comments(submissions_dict, gradebook_path)
 
-    # Print the modified dictionary with grades and comments
+    """# Print the modified dictionary with grades and comments
     print(modified_submissions_dict)
 
     # Export the modified dictionary as JSON
@@ -25,7 +27,7 @@ if __name__ == "__main__":
 
     # Prompt user for Section, Assignment ID, and Assignment Name
     section = input("Enter the Section: ")
-    assignment_name = input("Enter the Assignment Name: ")
+    # assignment_name = input("Enter the Assignment Name: ")
 
     # Use the inputs in calling the `prepare_for_canvas_upload` function
     csv_path = prepare_for_canvas_upload(
@@ -35,4 +37,4 @@ if __name__ == "__main__":
 
     generate_student_reports(
         modified_submissions_dict, r"D:\AutoGrader\reports", assignment_name
-    )
+    )"""
