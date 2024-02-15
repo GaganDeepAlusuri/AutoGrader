@@ -42,7 +42,7 @@ def process_submissions(folder_path):
     submissions_dict = {"SID": [], "S_NAME": [], "RAW_FILE": [], "PROCESSED_FILE": []}
 
     # Pattern to match the file naming convention: studentname_ID_SomeOtherID_NameofTheFile
-    pattern = r"(.+)_(\d+)_\w+_(.+)\."
+    pattern = r"([^_]+)_(\d+)_\w+_(.+)"
 
     for filename in os.listdir(folder_path):
         if filename.endswith(".py") or filename.endswith(".ipynb"):
@@ -115,8 +115,8 @@ def add_grades_and_comments(submissions_dict, directory_path):
         .index(next(col for col in headers.iloc[0] if "ID" in col))
     )
 
-    assignment_name = "Big Data 101"
-    possible_points = 20
+    assignment_name = input("Enter the Assignment Name: ")
+    possible_points = int(input("Enter the total points possible: "))
 
     # Find the index for the first "(read only)" column in the third header row
     read_only_col_index = (
@@ -132,18 +132,16 @@ def add_grades_and_comments(submissions_dict, directory_path):
     data.insert(
         read_only_col_index,
         assignment_name,
-        [random.randint(0, possible_points) for _ in range(len(data))],
+        ["" for _ in range(len(data))],  # Initially assign blank marks for all
     )
 
     # Assign grades based on the 'ID' column, ensuring all students are included
     for index, row in data.iterrows():
         sid = row[id_column_index]
-        # Assign random marks only if SID matches from submissions_dict
-        if str(sid) in submissions_dict:
-            data.at[index, assignment_name] = submissions_dict[str(sid)]
-        else:
-            # If not in submissions_dict, leave the random value already assigned
-            continue
+        # Check if the SID exists in submissions_dict
+        if str(sid) in submissions_dict["SID"]:
+            # If the student has a submission, assign a random mark
+            data.at[index, assignment_name] = random.randint(1, possible_points)
 
     # Combine the header and data for saving
     updated_gradebook_df = pd.concat([headers, data], ignore_index=True)
