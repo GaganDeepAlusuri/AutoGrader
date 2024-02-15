@@ -96,7 +96,7 @@ def add_grades_and_comments(submissions_dict, directory_path):
     csv_file_path = find_csv_filename(directory_path)
     if not csv_file_path:
         logger.error("CSV file not found in the specified directory.")
-        return
+        return None
 
     try:
         # Read the CSV with no header to manipulate rows separately
@@ -106,7 +106,7 @@ def add_grades_and_comments(submissions_dict, directory_path):
         logger.info(f"Gradebook loaded successfully from {csv_file_path}.")
     except Exception as e:
         logger.error(f"Failed to load the gradebook CSV: {e}")
-        return
+        return None
 
     # Check the correct name for the 'ID' column in the first row of headers
     id_column_index = (
@@ -157,10 +157,26 @@ def add_grades_and_comments(submissions_dict, directory_path):
         )
     except Exception as e:
         logger.error(f"Failed to save the updated gradebook: {e}")
+        return None
+
+    # Create list of dictionaries for comments
+    comments_list = []
+    for sid, sname in zip(submissions_dict["SID"], submissions_dict["S_NAME"]):
+        comments_list.append(
+            {
+                "Assignment": assignment_name,
+                "Student ID": sid,
+                "Student Name": sname,
+                "Points": random.randint(1, possible_points),
+                "Comments": "",
+            }
+        )
+
+    return updated_gradebook_path, comments_list
 
 
 # F3
-def prepare_for_canvas_upload(submissions_data, section, assignment_name):
+'''def prepare_for_canvas_upload(submissions_data, section, assignment_name):
     """
     Prepares a CSV file for uploading grades to Canvas Gradebook.
 
@@ -202,7 +218,7 @@ def prepare_for_canvas_upload(submissions_data, section, assignment_name):
         logger.error(f"Failed to prepare data for Canvas upload: {e}")
         raise e  # Rethrow exception after logging
 
-    return csv_file_path
+    return csv_file_path'''
 
 
 # F4
@@ -232,7 +248,7 @@ def generate_student_reports(submissions_data, directory_path, assignment_name):
         report_content = f"""# Assignment: {assignment_name}
 ## Student ID: {sid}
 ## Student Name: {student_name}
-### Percentage Mark: {percentage_grade:.2f}%
+### Points: {percentage_grade:.2f}%
 ### Comments:
 {comments}
 """
