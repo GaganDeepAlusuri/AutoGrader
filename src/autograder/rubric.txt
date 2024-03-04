@@ -1,0 +1,24 @@
+Grading Rubric (Total Points 10)
+Data Preprocessing (2 points)
+
+Correctly handle missing values, if any (0.5 points).
+Correctly identify and fix typos or inconsistencies in categorical data (0.5 points).
+Properly encode categorical variables using one-hot encoding or similar techniques (1 point).
+Data Visualization (2 points)
+
+Provide a scatter plot of the data points, coloring points by ownership status (1 point).
+Correctly label axes, including appropriate titles and legends (1 point).
+Model Building (3 points)
+
+Correctly standardizenormalize the features before model fitting (1 point).
+Properly instantiate and fit a logistic regression model using the preprocessed data (1 point).
+Include comments explaining the choice of parameters for the logistic regression model, if any were specifically chosen (1 point).
+Model Evaluation (3 points)
+
+Correctly compute and display a confusion matrix (0.75 points).
+Correctly calculate and report the model's accuracy (0.75 points).
+Correctly calculate and report the model's precision, recall, and F1 score (1.5 points).
+Additional Notes
+Deduct 0.5 points for each missing or incorrect label in plots.
+Deduct up to 1 point for lack of comments or explanations of steps taken during the assignment.
+Bonus Award up to 1 extra point for additional exploratory data analysis (EDA) insights or advanced model evaluation techniques beyond the basic requirements.
