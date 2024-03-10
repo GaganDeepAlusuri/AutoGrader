@@ -17,6 +17,17 @@ from tenacity import (
     stop_after_attempt,
     retry_if_exception_type,
 )
+from pydantic import BaseModel, Field
+from typing import List
+from pydantic import ValidationError
+
+
+from typing import Union, List, Dict
+
+
+class GradingComment(BaseModel):
+    points: float
+    comments: str
 
 
 load_dotenv()
@@ -253,7 +264,10 @@ from tenacity import retry, stop_after_attempt, wait_random_exponential
 )
 def get_completion(prompt):
     messages = [
-        {"role": "system", "content": prof},
+        {
+            "role": "system",
+            "content": "Activate Grading Mode.",
+        },
         {"role": "user", "content": prompt},
     ]
     response = client.chat.completions.create(
@@ -276,55 +290,34 @@ def get_points_and_comments_using_GPT4(
 ):
 
     possible_points = float(possible_points)
-    prompt = f"""
-Evaluate the submission for the assignment titled: <<<{assignment_name}>>>. The assignment question is: <<<{question}>>>. The grading rubric is enclosed in double quotes.
-
-
-Based on the rubric, ensure fairness and accuracy in the evaluation process. Deductions will be made according to the criteria outlined in the rubric. 
-After a thorough review, deductions will be calculated. The total deductions will be subtracted from a total possible score of ### {possible_points}. The submission\
-to be graded is enclosed in triple back ticks.
-
-Provide detailed feedback for each deduction, correlating comments with specific rubric criteria to guide the student's learning and improvement.
-Generate the output in JSON format with keys 'points' and 'comments' to reflect the final score and detailed feedback for each deduction.
-Do not provide  any text outputs in the response outside of structured json.
-
-Output Example:
-{{
-  "points": 3.0,
-  "comments": [
-    "A title and brief introduction for the assignment were missing.",
-    "Unused modules were imported, such as LogisticRegression and SimpleImputer.",
-    "There was no explicit mention of the absence of missing values in the dataset.",
-    "The train_test_split function was not used to split the data into training and validation sets.",
-    "The validation data was incorrectly fit using the StandardScaler.",
-    "No rationale was provided for the selection of k value in the KNN regressor.",
-    "The analysis was not recapped and the performance of the models was not discussed using the RMSE metric."
-  ]
-}}
-The submission file is: ```{processed_file}```
-The rubric is : "{rubric}"
-"""
+    prompt = f""" question:###{question}###,\
+                  Rubric: \"{rubric}\",
+                  Total points: {possible_points}, \
+                  ``SUBMISSION TO QUESTION ABOVE.``: ###{processed_file}###,
+                  ``Verify submission against rubric included in knowledge file prior to grading. Respond with a json output with keys points (consisting of final grade after deductions) and comments (A string for any deducted points and reason.).``
+                  """
 
     try:
         response_message = get_completion(prompt)
-        logger.debug(f"Received response_message: {response_message}")
+        logger.info(response_message)
 
-        # Check and strip the specific sequences from the response
-        if response_message.startswith("```json"):
-            response_message = response_message[len("```json") :]
+        # Use Pydantic for parsing and validation
+        grading_info = GradingComment.parse_raw(response_message)
 
-        if response_message.endswith("```"):
-            response_message = response_message[: -len("```")]
+        points = grading_info.points
+        # Handle comments being either a list or a dictionary
+        if isinstance(grading_info.comments, dict):
+            # Convert dictionary comments to a list of strings if needed
+            comments = [
+                f"{key}: {value}" for key, value in grading_info.comments.items()
+            ]
+        else:
+            # If it's already a list, use it directly
+            comments = grading_info.comments
 
-        # Removing any leading or trailing whitespace that may have been left after stripping
-        response_message = response_message.strip()
-
-        # Now the response_message should be clean and ready for JSON parsing
-        grading_info = json.loads(response_message)
-
-        points = grading_info.get("points", 0)
-        comments = grading_info.get("comments", [])
-
+    except ValidationError as e:
+        logger.error(f"Validation error: {e} for student id: {sid}")
+        points, comments = 0, ["Validation error. Check the data structure."]
     except json.JSONDecodeError as e:
         logger.error(f"JSON decoding error: {e} for student id: {sid}")
         points, comments = 0, [
