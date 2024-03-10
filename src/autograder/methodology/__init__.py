@@ -238,8 +238,6 @@ def add_grades_and_comments(submissions_dict, directory_path):
 
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
-# Assuming the rest of your imports and code setup remains the same
-
 
 @retry(
     retry=retry_if_exception_type(
