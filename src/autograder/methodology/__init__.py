@@ -27,7 +27,14 @@ load_dotenv()
 # prof = """You are a programming expert tasked with evaluating student submissions for a programming assignment. Your evaluation should strictly adhere to the provided grading rubric. Each submission needs to be graded based on the assignment's requirements, and feedback should be given in the form of points and detailed comments. For each deduction in points, specify the reason based on the rubric. The feedback should be structured as a JSON object with two keys: 'points' and 'comments'. The 'points' key should contain the numeric grade awarded to the submission out of the total points possible, and the 'comments' key should list reasons for each deduction, directly correlating to the rubric's criteria."""
 
 
-def add_grades_and_comments(submissions_dict, directory_path):
+def add_grades_and_comments(
+    submissions_dict,
+    directory_path,
+    assignment_name,
+    possible_points,
+    question_file_path,
+    rubric_file_path,
+):
     csv_file_path = find_csv_filename(directory_path)
     if not csv_file_path:
         logger.error("CSV file not found in the specified directory.")
@@ -47,9 +54,6 @@ def add_grades_and_comments(submissions_dict, directory_path):
         .tolist()
         .index(next(col for col in headers.iloc[0] if "ID" in col))
     )
-    assignment_name = input("Enter the Assignment Name: ")
-    possible_points = int(input("Enter the total points possible: "))
-
     read_only_col_index = (
         headers.iloc[2]
         .tolist()
@@ -60,13 +64,6 @@ def add_grades_and_comments(submissions_dict, directory_path):
 
     headers.insert(read_only_col_index, assignment_name, ["", "", possible_points])
     data.insert(read_only_col_index, assignment_name, ["" for _ in range(len(data))])
-
-    question_file_path = input(
-        "Enter the path to the text file containing the question: "
-    ).strip('"')
-    rubric_file_path = input(
-        "Enter the path to the text file containing the rubric: "
-    ).strip('"')
 
     question = read_file_content(question_file_path)
     rubric = read_file_content(rubric_file_path)
