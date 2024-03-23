@@ -15,7 +15,7 @@ from src.autograder.utils import (
     read_file_content,
     find_csv_filename,
     get_completion,
-    get_completion3,
+    get_completionReAct,
 )
 from pydantic import BaseModel, Field
 
@@ -81,7 +81,7 @@ def add_grades_and_comments_ReAct(
         Here is the rubric: ```{rubric}```\
         How would you go about grading this assignment for a final grade and feedback for the student's submission? What steps would you take to achieve this?"""
     try:
-        grading_guidelines = get_completion3(prof, prompt_for_guidelines)
+        grading_guidelines = get_completionReAct(prof, prompt_for_guidelines)
         logger.info(f"Grading guidelines extracted:{grading_guidelines}")
     except Exception as e:
         logger.error(f"Failed to extract the grading guidelines: {e}")

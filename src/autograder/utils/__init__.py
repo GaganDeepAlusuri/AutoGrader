@@ -135,7 +135,24 @@ def get_completion(prompt):
     return response_message
 
 
-def get_completion2(prompt2):
+def get_completionCOT(sys_content, prompt):
+    messages = [
+        {
+            "role": "system",
+            "content": sys_content,
+        },
+        {"role": "user", "content": prompt},
+    ]
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0,
+    )
+    response_message = response.choices[0].message.content
+    return response_message
+
+
+def get_completion_keywords(prompt2):
     messages = [
         {
             "role": "system",
@@ -152,7 +169,7 @@ def get_completion2(prompt2):
     return response_message
 
 
-def get_completion3(sys_content, prompt3):
+def get_completionReAct(sys_content, prompt3):
     messages = [
         {
             "role": "system",
