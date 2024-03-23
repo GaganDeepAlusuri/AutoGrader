@@ -26,8 +26,8 @@ from src.autograder.utils import (
     GradingComment,
     read_file_content,
     find_csv_filename,
-    get_completion,
-    get_completion2,
+    get_completionCOT,
+    get_completion_keywords,
 )
 
 
@@ -85,7 +85,7 @@ def add_grades_and_comments_COT(
     data.insert(read_only_col_index, assignment_name, ["" for _ in range(len(data))])
 
     question = read_file_content(question_file_path)
-    keywords_from_question = get_completion2(question)
+    keywords_from_question = get_completion_keywords(question)
     logger.info(f"Keywords from question: {keywords_from_question}")
     rubric = read_file_content(rubric_file_path)
 
@@ -230,7 +230,7 @@ def get_points_and_comments_using_GPT4(
         relevant_contexts if relevant_contexts else "No relevant context was found."
     )
     logger.info(f"Context Retrived:{context_str}")
-
+    user_message = f"Evaluate the student's submission and provide only a JSON output with points and comments:{processed_file}"
     # Construct the prompt for GPT-4 with the relevant contexts, assignment question, rubric, and the student's submission
     prompt_template = f"""
 First, consider the following contexts relevant to the assignment: {context_str}
@@ -261,12 +261,9 @@ Example 2 JSON Output:
   "points": 7.5,
   "comments": "Your partially meets the requirements of the assignment. You successfully loaded the data, conducted a train/test split, and fitted both a Linear Regression and KNN model. However, there were several areas where the submission fell short. First, you did not provide a title or introduction for their analysis, resulting in a deduction of 0.5 points. Second, you did not discuss their selection of k value for the KNN model, resulting in a deduction of 1.0 points. Lastly, you did not recap their analysis or discuss the performance of the models using the RMSE metric, resulting in a deduction of 1.0 points. To improve, you should ensure they provide a clear introduction and conclusion for their analysis, and thoroughly discuss your model selection and performance evaluation process."
 }}
-
-Now, evaluate the student's submission and provide only a JSON output with points and comments:
-{processed_file}
 """.strip()
     try:
-        response_message = get_completion(prompt_template)
+        response_message = get_completionCOT(prompt_template, user_message)
         logger.info(f"Response: {response_message}")
 
         # Assuming the response is well-structured JSON, parse it directly
