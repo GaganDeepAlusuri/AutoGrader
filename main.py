@@ -8,7 +8,6 @@ from src.autograder.methodologyReAct import add_grades_and_comments_ReAct
 
 from src.autograder.logging import logger
 import json
-import os
 
 
 def export_as_json(data, filename):
@@ -16,39 +15,71 @@ def export_as_json(data, filename):
         json.dump(data, f, indent=4)
 
 
+def apply_methodology(methodology, submissions, gradebook_path):
+    if methodology == "M1":
+        return add_grades_and_comments(
+            submissions,
+            gradebook_path,
+            assignment_name,
+            possible_points,
+            question_file_path,
+            rubric_file_path,
+        )
+    elif methodology == "M2":
+        return add_grades_and_comments_COT(
+            submissions,
+            gradebook_path,
+            assignment_name,
+            possible_points,
+            question_file_path,
+            rubric_file_path,
+        )
+    elif methodology == "M3":
+        return add_grades_and_comments_ReAct(
+            submissions,
+            gradebook_path,
+            assignment_name,
+            possible_points,
+            question_file_path,
+            rubric_file_path,
+        )
+    else:
+        logger.error("Unknown methodology.")
+        return None, None
+
+
 if __name__ == "__main__":
     folder_path = input("Enter the path to the folder containing student submissions: ")
     gradebook_path = input("Enter the path to the folder containing the Gradebook: ")
+    assignment_name = input("Enter the Assignment Name: ")
+    possible_points = int(input("Enter the total points possible: "))
+    question_file_path = input(
+        "Enter the path to the text file containing the question: "
+    ).strip('"')
+    rubric_file_path = input(
+        "Enter the path to the text file containing the rubric: "
+    ).strip('"')
     submissions_dict = process_submissions(folder_path)
-    logger.info("Student submissions processed.")
-    logger.info(f"Submissions dictionary: {submissions_dict}")
-    if submissions_dict:
-        # Add percentage grades and comments using M1
-        updated_gradebook_path, comments_list = add_grades_and_comments(
-            submissions_dict, gradebook_path
-        )
-    logger.info(comments_list)
-    export_as_json(comments_list, "commentsM1.json")
-    logger.info("Comments exported using Methodolgy 1 as commentsM1.json.")
 
-    # Generate and store data in vector DB before processing submissions
-    print("Generating and storing data in vector DB...")
-    generate_data_store()
-    if submissions_dict:
-        # Add percentage grades and comments using M2
-        updated_gradebook_path, comments_list = add_grades_and_comments_COT(
-            submissions_dict, gradebook_path
-        )
-    logger.info(comments_list)
-    export_as_json(comments_list, "commentsM2.json")
-    logger.info("Comments exported using Methodolgy 2 as commentsM2.json.")
+    if not submissions_dict:
+        logger.error("No submissions found.")
+    else:
+        logger.info("Student submissions processed.")
+        # Pre-process for M2 if needed
+        print("Generating and storing data in vector DB for Methodology 2...")
+        generate_data_store()
 
-    # -----------ReAct--------------------#
-    if submissions_dict:
-        # Add percentage grades and comments using M1
-        updated_gradebook_path, comments_list = add_grades_and_comments_ReAct(
-            submissions_dict, gradebook_path
-        )
-    logger.info(comments_list)
-    export_as_json(comments_list, "commentsM3.json")
-    logger.info("Comments exported using Methodolgy 3 as commentsM3.json.")
+        for methodology in ["M1", "M2", "M3"]:
+            updated_gradebook_path, comments_list = apply_methodology(
+                methodology, submissions_dict, gradebook_path
+            )
+            if comments_list:
+                comments_file = f"comments{methodology}.json"
+                export_as_json(comments_list, comments_file)
+                logger.info(
+                    f"Comments exported using Methodology {methodology} as {comments_file}."
+                )
+            else:
+                logger.error(
+                    f"Failed to process submissions using Methodology {methodology}."
+                )

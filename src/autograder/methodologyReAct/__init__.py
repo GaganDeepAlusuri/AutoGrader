@@ -29,7 +29,14 @@ load_dotenv()
 prof = """You are a programming expert tasked with evaluating student submissions for a programming assignment. Your evaluation should strictly adhere to the provided grading rubric."""
 
 
-def add_grades_and_comments_ReAct(submissions_dict, directory_path):
+def add_grades_and_comments_ReAct(
+    submissions_dict,
+    directory_path,
+    assignment_name,
+    possible_points,
+    question_file_path,
+    rubric_file_path,
+):
     csv_file_path = find_csv_filename(directory_path)
     if not csv_file_path:
         logger.error("CSV file not found in the specified directory.")
@@ -49,8 +56,6 @@ def add_grades_and_comments_ReAct(submissions_dict, directory_path):
         .tolist()
         .index(next(col for col in headers.iloc[0] if "ID" in col))
     )
-    assignment_name = input("Enter the Assignment Name: ")
-    possible_points = int(input("Enter the total points possible: "))
 
     read_only_col_index = (
         headers.iloc[2]
@@ -62,13 +67,6 @@ def add_grades_and_comments_ReAct(submissions_dict, directory_path):
 
     headers.insert(read_only_col_index, assignment_name, ["", "", possible_points])
     data.insert(read_only_col_index, assignment_name, ["" for _ in range(len(data))])
-
-    question_file_path = input(
-        "Enter the path to the text file containing the question: "
-    ).strip('"')
-    rubric_file_path = input(
-        "Enter the path to the text file containing the rubric: "
-    ).strip('"')
 
     question = read_file_content(question_file_path)
     rubric = read_file_content(rubric_file_path)
