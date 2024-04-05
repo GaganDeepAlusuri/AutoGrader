@@ -152,6 +152,23 @@ def get_completionCOT(sys_content, prompt):
     return response_message
 
 
+def get_completionCOTMultiCalls(prompt):
+    messages = [
+        {
+            "role": "system",
+            "content": "You are an experienced Data Science Professor.",
+        },
+        {"role": "user", "content": prompt},
+    ]
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0,
+    )
+    response_message = response.choices[0].message.content
+    return response_message
+
+
 def get_completion_keywords(prompt2):
     messages = [
         {
