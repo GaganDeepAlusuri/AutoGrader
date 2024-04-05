@@ -10,3 +10,4 @@ langchain-openai
 unstructured
 langchain-community
 "unstructured[md]"
+streamlit

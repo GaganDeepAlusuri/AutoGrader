@@ -27,6 +27,7 @@ from src.autograder.utils import (
     read_file_content,
     find_csv_filename,
     get_completionCOT,
+    get_completion_keywords,
 )
 
 
@@ -40,8 +41,11 @@ class GradingCommentCOT(BaseModel):
 
 load_dotenv()
 
+CHROMA_PATH = "chroma"
+DATA_PATH = "src/autograder/data"
 
-def add_grades_and_comments_COT(
+
+def add_grades_and_comments_COTRAG(
     submissions_dict,
     directory_path,
     assignment_name,
@@ -81,6 +85,8 @@ def add_grades_and_comments_COT(
     data.insert(read_only_col_index, assignment_name, ["" for _ in range(len(data))])
 
     question = read_file_content(question_file_path)
+    keywords_from_question = get_completion_keywords(question)
+    logger.info(f"Keywords from question: {keywords_from_question}")
     rubric = read_file_content(rubric_file_path)
 
     if question is None or rubric is None:
@@ -102,6 +108,7 @@ def add_grades_and_comments_COT(
                 possible_points,
                 question,
                 rubric,
+                keywords_from_question,
             )
 
             data.at[index, assignment_name] = points
@@ -119,7 +126,7 @@ def add_grades_and_comments_COT(
     updated_gradebook_df = pd.concat([headers, data], ignore_index=True)
     updated_gradebook_df.iloc[0, read_only_col_index] = assignment_name
 
-    updated_gradebook_path = csv_file_path.replace(".csv", "_updatedM4.csv")
+    updated_gradebook_path = csv_file_path.replace(".csv", "_updatedM2.csv")
     try:
         updated_gradebook_df.to_csv(updated_gradebook_path, index=False, header=False)
         logger.info(
@@ -132,6 +139,79 @@ def add_grades_and_comments_COT(
     return updated_gradebook_path, comments_list
 
 
+############ Setting up the vector DB ################
+
+
+def generate_data_store():
+    # Check if the Chroma Vector Store already exists
+    if os.path.exists(CHROMA_PATH):
+        logger.info("Chroma Vector Store already exists. Skipping embedding process.")
+        return
+
+    documents = load_documents()
+    chunks = split_text(documents)
+    save_to_chroma(chunks)
+
+
+def load_documents():
+    loader = DirectoryLoader(
+        DATA_PATH, glob="*.md"
+    )  # Now adjusted to include both Markdown and PDF files
+    documents = loader.load()
+    return documents
+
+
+def split_text(documents: List[Document]):
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=300, chunk_overlap=100, length_function=len, add_start_index=True
+    )
+    chunks = text_splitter.split_documents(documents)
+    logger.info(f"Split {len(documents)} documents into {len(chunks)} chunks.")
+    document = chunks[10]
+    print(document.page_content)
+    print(document.metadata)
+    return chunks
+
+
+def save_to_chroma(chunks: list[Document]):
+
+    # Create a new DB from the documents.
+    db = Chroma.from_documents(
+        chunks, OpenAIEmbeddings(), persist_directory=CHROMA_PATH
+    )
+    db.persist()
+    print(f"Saved {len(chunks)} chunks to {CHROMA_PATH}.")
+
+
+from langchain.vectorstores import Chroma
+
+
+def query_vector_store(query: str, top_k=3):
+    """
+    Queries the vector store for documents relevant to the provided query string.
+
+    Args:
+        query (str): The query string to search for relevant documents.
+        top_k (int): The number of top relevant documents to retrieve.
+
+    Returns:
+        A list of document contents that are most relevant to the query.
+    """
+    embedding_function = OpenAIEmbeddings()
+    # Load the Chroma VectorStore
+    db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+
+    # Perform the similarity search with relevance scores.
+    results = db.similarity_search_with_relevance_scores(query, k=top_k)
+    if not results or results[0][1] < 0.7:
+        print("Unable to find matching results with high relevance.")
+        return []
+
+    # Format the results into a string of context texts.
+    context_texts = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
+    return context_texts
+
+
 def get_points_and_comments_using_GPT4(
     sid,
     student_name,
@@ -140,10 +220,21 @@ def get_points_and_comments_using_GPT4(
     possible_points,
     question,
     rubric,
+    keywords_from_question,
 ):
+    # Query the vector store for relevant contexts based on the assignment question's keywords.
+    relevant_contexts = query_vector_store(keywords_from_question, top_k=3)
+
+    # Check if relevant contexts were found. If not, prepare a default message.
+    context_str = (
+        relevant_contexts if relevant_contexts else "No relevant context was found."
+    )
+    logger.info(f"Context Retrived:{context_str}")
     user_message = f"Evaluate the student's submission and provide only a JSON output with points and comments:{processed_file}"
     # Construct the prompt for GPT-4 with the relevant contexts, assignment question, rubric, and the student's submission
     prompt_template = f"""
+First, consider the following contexts relevant to the assignment: {context_str}
+
 Given the assignment question: {question}
 And the grading rubric: {rubric}
 
