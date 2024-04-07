@@ -140,6 +140,15 @@ def get_points_and_comments_using_GPT4(
 
     try:
         response_message = get_completion(prompt)
+        cleaned_response_message = response_message.strip("`").replace("json\n", "")
+        json_match = re.search(r"\{.*\}", cleaned_response_message, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(0)
+            logger.info("Extracted JSON string: %s", json_str)
+            return GradingComment.parse_raw(json_str)
+        else:
+            logger.error("No JSON found in the response.")
+
         logger.info(response_message)
 
         # Use Pydantic for parsing and validation

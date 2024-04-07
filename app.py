@@ -17,6 +17,7 @@ from src.autograder.methodologyCOTMultiCalls import (
     add_grades_and_comments_COTMultiCalls,
 )
 import pandas as pd
+import ast
 
 
 def apply_methodology(
@@ -115,6 +116,23 @@ question = st.text_area("Question")
 rubric = st.text_area("Rubric")
 
 
+# Define the function to clean the grade values
+def clean_grade(value):
+    try:
+        # First check if value is a string that needs to be converted to a tuple
+        if isinstance(value, str) and value.startswith("('points',"):
+            # Convert string to actual tuple
+            value = ast.literal_eval(value)
+        if isinstance(value, tuple):
+            # If it's a tuple, return the second element (the grade)
+            return value[1]
+        return value
+    except Exception as e:
+        # Log the error
+        print(f"Error converting grade: {e}")
+        return value
+
+
 def process_submissions_ui():
     with st.spinner("Processing... Please wait."):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -151,18 +169,29 @@ def process_submissions_ui():
                 rubric_file_path=rubric_path,
             )
 
-            # Handle results and store in session state
-            if updated_gradebook_path and comments_list:
-                # Reading the gradebook content
+            # New part to clean the grades starts here
+            if updated_gradebook_path and os.path.exists(updated_gradebook_path):
+                gradebook_df = pd.read_csv(updated_gradebook_path)
+                # Apply the clean_grade function to the assignment_name column
+                gradebook_df[assignment_name] = gradebook_df[assignment_name].apply(
+                    clean_grade
+                )
+                # Write the cleaned DataFrame back to the CSV
+                gradebook_df.to_csv(updated_gradebook_path, index=False)
+
                 with open(updated_gradebook_path, "rb") as file:
                     st.session_state["gradebook_content"] = file.read()
 
-                # Preparing comments content
+            # Preparing comments content
+            if comments_list:
                 comments_df = pd.DataFrame(comments_list)
+                comments_df["Points"] = comments_df["Points"].apply(clean_grade)
                 st.session_state["comments_content"] = comments_df.to_csv(
                     index=False
                 ).encode("utf-8")
 
+            # Display success or error messages
+            if updated_gradebook_path and comments_list:
                 st.success("Grading complete!")
                 st.balloons()
             else:
@@ -175,7 +204,7 @@ if st.button("Process Submissions") and uploaded_files and uploaded_gradebook:
     process_submissions_ui()
 
 # Display download buttons if content is available
-if st.session_state["gradebook_content"]:
+if st.session_state.get("gradebook_content"):
     st.download_button(
         label="Download Updated Gradebook",
         data=st.session_state["gradebook_content"],
@@ -183,7 +212,7 @@ if st.session_state["gradebook_content"]:
         mime="text/csv",
     )
 
-if st.session_state["comments_content"]:
+if st.session_state.get("comments_content"):
     st.download_button(
         label="Download Comments",
         data=st.session_state["comments_content"],
