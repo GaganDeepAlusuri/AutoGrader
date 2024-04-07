@@ -4,6 +4,8 @@ from pydantic import BaseModel
 import nbformat
 import re
 
+model = "gpt-4"
+
 
 class GradingComment(BaseModel):
     points: float
@@ -103,7 +105,6 @@ import openai
 from openai import OpenAI
 
 client = OpenAI()
-model = "gpt-4"
 
 
 @retry(
@@ -195,7 +196,7 @@ def get_completionReAct(sys_content, prompt3):
         {"role": "user", "content": prompt3},
     ]
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model=model,
         messages=messages,
         temperature=0,
     )

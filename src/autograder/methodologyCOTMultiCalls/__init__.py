@@ -19,7 +19,7 @@ from src.autograder.utils import (
     find_csv_filename,
     get_completionCOTMultiCalls,
 )
-
+import re
 
 from typing import Dict, Any
 from pydantic import BaseModel
@@ -84,8 +84,14 @@ def generate_deduction_plan(
    }}
     """
     deduction_plan_response = get_completionCOTMultiCalls(prompt_template)
-    logger.info("Deduction plan response: %s", deduction_plan_response)
-    return DeductionPlan.parse_deduction_plan(deduction_plan_response)
+    json_match = re.search(r"\{.*\}", deduction_plan_response, re.DOTALL)
+    if json_match:
+        json_str = json_match.group(0)
+        logger.info("Extracted JSON string: %s", json_str)
+        return DeductionPlan.parse_deduction_plan(json_str)
+    else:
+        logger.error("No JSON found in the response.")
+        return None
 
 
 def evaluate_submission(
@@ -116,8 +122,15 @@ def evaluate_submission(
 }}
     """
     evaluation_response = get_completionCOTMultiCalls(prompt_template)
-    logger.info("Raw evaluation response: %s", evaluation_response)
-    return SubmissionEvaluation.parse_raw(evaluation_response)
+
+    json_match = re.search(r"\{.*\}", evaluation_response, re.DOTALL)
+    if json_match:
+        json_str = json_match.group(0)
+        logger.info("Extracted JSON string: %s", json_str)
+        return SubmissionEvaluation.parse_raw(json_str)
+    else:
+        logger.error("No JSON found in the response.")
+        return None
 
 
 def finalize_grade(evaluation: dict, possible_points: int) -> dict:
@@ -141,7 +154,15 @@ Example 2 JSON Output:
 }}
     """
     final_grade_response = get_completionCOTMultiCalls(prompt_template)
-    return FinalGrade.parse_raw(final_grade_response)
+    cleaned_final_grade_response = final_grade_response.strip("`").replace("json\n", "")
+    json_match = re.search(r"\{.*\}", cleaned_final_grade_response, re.DOTALL)
+    if json_match:
+        json_str = json_match.group(0)
+        logger.info("Extracted JSON string: %s", json_str)
+        return FinalGrade.parse_raw(json_str)
+    else:
+        logger.error("No JSON found in the response.")
+        return None
 
 
 def add_grades_and_comments_COTMultiCalls(

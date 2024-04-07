@@ -149,10 +149,15 @@ Provide only a JSON output with 'points' and 'comments' as the keys in the respo
 
     try:
         response_message = get_completion(grading_prompt)
-        logger.info(f"Response: {response_message}")
+        json_match = re.search(r"\{.*\}", response_message, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(0)
+        else:
+            logger.error(f"Response is: {json_str}")
+        logger.info(f"Response: {json_str}")
 
         # Assuming the response is well-structured JSON, parse it directly
-        grading_info = GradingCommentReAct.parse_raw(response_message)
+        grading_info = GradingCommentReAct.parse_raw(json_str)
         return grading_info.points, grading_info.comments
     except Exception as e:
         logger.error(f"Error processing grading for student ID {sid}: {e}")
