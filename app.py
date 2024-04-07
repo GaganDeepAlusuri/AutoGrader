@@ -19,6 +19,22 @@ from src.autograder.methodologyCOTMultiCalls import (
 import pandas as pd
 import ast
 
+# plotting
+import io
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+st.markdown(
+    """
+  <style>
+    .block-container.st-emotion-cache-1y4p8pa.ea3mdgi2 {
+      margin-right: 25rem !important;
+    }
+  </style>
+""",
+    unsafe_allow_html=True,
+)
+
 
 def apply_methodology(
     methodology,
@@ -94,45 +110,6 @@ def apply_methodology(
         return None, None
 
 
-st.title("AutoGrader")
-
-# Define session state variables for storing file data if not already done
-if "gradebook_content" not in st.session_state:
-    st.session_state["gradebook_content"] = None
-if "comments_content" not in st.session_state:
-    st.session_state["comments_content"] = None
-
-methodology_options = ["M1", "M2", "M3", "M4", "M5"]
-methodology = st.selectbox("Select Grading Methodology", options=methodology_options)
-
-uploaded_files = st.file_uploader(
-    "Upload Student Submissions", accept_multiple_files=True
-)
-uploaded_gradebook = st.file_uploader("Upload Gradebook", type=["xlsx", "csv"])
-
-assignment_name = st.text_input("Assignment Name")
-possible_points = st.number_input("Possible Points", min_value=0)
-question = st.text_area("Question")
-rubric = st.text_area("Rubric")
-
-
-# Define the function to clean the grade values
-def clean_grade(value):
-    try:
-        # First check if value is a string that needs to be converted to a tuple
-        if isinstance(value, str) and value.startswith("('points',"):
-            # Convert string to actual tuple
-            value = ast.literal_eval(value)
-        if isinstance(value, tuple):
-            # If it's a tuple, return the second element (the grade)
-            return value[1]
-        return value
-    except Exception as e:
-        # Log the error
-        print(f"Error converting grade: {e}")
-        return value
-
-
 def process_submissions_ui():
     with st.spinner("Processing... Please wait."):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -200,6 +177,53 @@ def process_submissions_ui():
                 )
 
 
+# Define the function to clean the grade values
+def clean_grade(value):
+    try:
+        # First check if value is a string that needs to be converted to a tuple
+        if isinstance(value, str) and value.startswith("('points',"):
+            # Convert string to actual tuple
+            value = ast.literal_eval(value)
+        if isinstance(value, tuple):
+            # If it's a tuple, return the second element (the grade)
+            return value[1]
+        return value
+    except Exception as e:
+        # Log the error
+        print(f"Error converting grade: {e}")
+        return value
+
+
+st.title("AutoGrader")
+
+# Define session state variables for storing file data if not already done
+if "gradebook_content" not in st.session_state:
+    st.session_state["gradebook_content"] = None
+if "comments_content" not in st.session_state:
+    st.session_state["comments_content"] = None
+
+# Sidebar: File Uploaders and Assignment Details
+with st.sidebar:
+    st.subheader("Upload Files")
+    uploaded_files = st.file_uploader(
+        "Upload Student Submissions", accept_multiple_files=True, key="files"
+    )
+    uploaded_gradebook = st.file_uploader(
+        "Upload Gradebook", type=["xlsx", "csv"], key="gradebook"
+    )
+
+    st.subheader("Assignment Details and Grading Methodology")
+    assignment_name = st.text_input("Assignment Name")
+    possible_points = st.number_input("Possible Points", min_value=0)
+    methodology_options = ["M1", "M2", "M3", "M4", "M5"]
+    methodology = st.selectbox(
+        "Select Grading Methodology", options=methodology_options
+    )
+# Main Area: Question, Rubric, and Process Button
+question = st.text_area("Question", "Enter the question here...", height=200)
+rubric = st.text_area("Rubric", "Enter the rubric here...", height=300)
+
+# buttons
 if st.button("Process Submissions") and uploaded_files and uploaded_gradebook:
     process_submissions_ui()
 
@@ -219,3 +243,57 @@ if st.session_state.get("comments_content"):
         file_name="comments.csv",
         mime="text/csv",
     )
+
+
+if st.session_state.get("gradebook_content"):
+    gradebook_df = pd.read_csv(
+        io.StringIO(st.session_state["gradebook_content"].decode("utf-8"))
+    )
+    # st.write(gradebook_df)
+    grades_df = pd.to_numeric(gradebook_df[assignment_name], errors="coerce").dropna()
+    st.write("Summary statistics for assignment: " + assignment_name)
+    with st.expander("See summary statistics"):
+        st.table(grades_df.describe())
+
+# Set theme
+sns.set_theme(style="whitegrid")
+
+# Create enhanced boxplot
+plt.figure(figsize=(10, 6))  # Set figure size for better readability
+ax = sns.boxplot(
+    x=grades_df,
+    orient="h",
+    palette="Greens",  # Use a palette for color
+    showmeans=True,
+    meanprops={
+        "marker": "D",  # Use a diamond shape for the mean
+        "markerfacecolor": "red",  # Highlight mean marker
+        "markeredgecolor": "black",
+        "markersize": "10",
+    },
+    linewidth=2.5,  # Thicker box lines
+    fliersize=5,  # Adjust outlier marker size
+)
+
+# Add annotations for mean and median
+mean_val = grades_df.mean()
+median_val = grades_df.median()
+plt.text(mean_val, 0.5, f"Mean: {mean_val:.2f}", color="red", ha="center", va="center")
+plt.text(
+    median_val,
+    0.3,
+    f"Median: {median_val:.2f}",
+    color="blue",
+    ha="center",
+    va="center",
+)
+
+# Title and labels
+plt.title(f"Grades Distribution for {assignment_name}", fontsize=16)
+plt.xlabel("Grades", fontsize=14)
+
+# Display the plot
+st.pyplot(plt.gcf())
+
+# Clear the plot
+plt.clf()
