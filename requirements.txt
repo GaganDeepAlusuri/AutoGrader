@@ -11,3 +11,4 @@ unstructured
 langchain-community
 "unstructured[md]"
 streamlit
+seaborn

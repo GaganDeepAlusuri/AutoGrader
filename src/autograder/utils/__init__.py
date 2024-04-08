@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import nbformat
 import re
 
-model = "gpt-4"
+model = "gpt-3.5-turbo"
 
 
 class GradingComment(BaseModel):
@@ -195,6 +195,40 @@ def get_completionReAct(sys_content, prompt3):
         },
         {"role": "user", "content": prompt3},
     ]
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0,
+    )
+    response_message = response.choices[0].message.content
+    return response_message
+
+
+def get_topComments(comments):
+    # Define the content of the system message using an f-string variable
+    system_content = f"""You are an experienced Data Science Professor. \
+To systematically analyze a dataset of TA comments on student assignments and extract the top 5 most frequently mentioned mistakes. \
+This will help in identifying areas where students commonly struggle, enabling targeted support and instructional improvement. Follow the below \
+steps to do this:
+step 1: Read through the comments enclosed in the triple back ticks below to get an overall sense of the feedback themes.
+step 2: Note any recurring mistakes or areas of improvement mentioned by the TA.
+step 3: Create categories based on the types of mistakes identified (e.g., Model Selection, Data Preprocessing, Result Interpretation).
+step 4: Assign each specific mistake mentioned in the comments to its corresponding category.
+step 5: Tally the frequency of each mistake within its category.
+step 6: Rank the mistakes from most to least common based on their frequency.
+step 7: Identify the top 5 mistakes based on the ranking.
+step 8: Put them in a python list to display.
+
+Here are the comments:```{comments}```\
+Make sure to only respond with the top 5 mistakes as a python list. No other output or introduction or heading is needed. \
+Just output the top 5 mistakes as a python list.
+"""
+
+    messages = [
+        {"role": "system", "content": system_content},
+        {"role": "user", "content": comments},
+    ]
+
     response = client.chat.completions.create(
         model=model,
         messages=messages,
