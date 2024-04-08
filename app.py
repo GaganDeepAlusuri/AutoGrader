@@ -6,7 +6,7 @@ import os
 import shutil
 from src.autograder.logging import logger
 from src.autograder.methodology import add_grades_and_comments
-from src.autograder.utils import process_submissions, get_topComments
+from src.autograder.utils import process_submissions
 from src.autograder.methodologyCOTRAG import (
     add_grades_and_comments_COTRAG,
     generate_data_store,
@@ -320,9 +320,3 @@ if st.session_state.get("gradebook_content"):
 
     # Clear the plot
     plt.clf()
-
-    # Display the top mistakes.
-    top_mistakes = get_topComments(com_list)
-    logger.info(f"Top mistakes identified are:\n {top_mistakes}")
-    st.subheader("Most common feedback comments")
-    st.write(top_mistakes)

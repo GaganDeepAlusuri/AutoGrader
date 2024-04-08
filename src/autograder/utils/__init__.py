@@ -204,14 +204,14 @@ def get_completionReAct(sys_content, prompt3):
     return response_message
 
 
-def get_topComments(comments):
+'''def get_topComments(comments):
     # Define the content of the system message using an f-string variable
     system_content = f"""You are an experienced Data Science Professor. \
 To systematically analyze a dataset of TA comments on student assignments and extract the top 5 most frequently mentioned mistakes. \
 This will help in identifying areas where students commonly struggle, enabling targeted support and instructional improvement. Follow the below \
 steps to do this:
 step 1: Read through the comments enclosed in the triple back ticks below to get an overall sense of the feedback themes.
-step 2: Note any recurring mistakes or areas of improvement mentioned by the TA.
+step 2: Note any recurring mistakes or areas of improvement mentioned by the TA. Do not make up any mistakes or areas on your own. Stick strictly to only the provived comments that are enclosed in triple back ticks below.
 step 3: Create categories based on the types of mistakes identified (e.g., Model Selection, Data Preprocessing, Result Interpretation).
 step 4: Assign each specific mistake mentioned in the comments to its corresponding category.
 step 5: Tally the frequency of each mistake within its category.
@@ -230,9 +230,10 @@ Just output the top 5 mistakes as a python list.
     ]
 
     response = client.chat.completions.create(
-        model=model,
+        model="gpt-4",
         messages=messages,
         temperature=0,
     )
     response_message = response.choices[0].message.content
     return response_message
+'''
