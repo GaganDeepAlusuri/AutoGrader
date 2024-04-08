@@ -6,7 +6,7 @@ import os
 import shutil
 from src.autograder.logging import logger
 from src.autograder.methodology import add_grades_and_comments
-from src.autograder.utils import process_submissions
+from src.autograder.utils import process_submissions, get_topComments
 from src.autograder.methodologyCOTRAG import (
     add_grades_and_comments_COTRAG,
     generate_data_store,
@@ -110,6 +110,9 @@ def apply_methodology(
         return None, None
 
 
+com_list = list()
+
+
 def process_submissions_ui():
     with st.spinner("Processing... Please wait."):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -145,6 +148,7 @@ def process_submissions_ui():
                 question_file_path=question_path,
                 rubric_file_path=rubric_path,
             )
+            com_list = comments_list
 
             # New part to clean the grades starts here
             if updated_gradebook_path and os.path.exists(updated_gradebook_path):
@@ -163,6 +167,7 @@ def process_submissions_ui():
             if comments_list:
                 comments_df = pd.DataFrame(comments_list)
                 comments_df["Points"] = comments_df["Points"].apply(clean_grade)
+                comments_df["Comments"] = comments_df["Comments"].apply(clean_comment)
                 st.session_state["comments_content"] = comments_df.to_csv(
                     index=False
                 ).encode("utf-8")
@@ -191,6 +196,22 @@ def clean_grade(value):
     except Exception as e:
         # Log the error
         print(f"Error converting grade: {e}")
+        return value
+
+
+def clean_comment(value):
+    try:
+        # First check if value is a string that needs to be converted to a tuple
+        if isinstance(value, str) and value.startswith("('comments',"):
+            # Convert string to actual tuple
+            value = ast.literal_eval(value)
+        if isinstance(value, tuple):
+            # If it's a tuple, return the second element (the comment)
+            return value[1]
+        return value
+    except Exception as e:
+        # Log the error
+        print(f"Error cleaning comment: {e}")
         return value
 
 
@@ -255,45 +276,53 @@ if st.session_state.get("gradebook_content"):
     with st.expander("See summary statistics"):
         st.table(grades_df.describe())
 
-# Set theme
-sns.set_theme(style="whitegrid")
+    # Set theme
+    sns.set_theme(style="whitegrid")
 
-# Create enhanced boxplot
-plt.figure(figsize=(10, 6))  # Set figure size for better readability
-ax = sns.boxplot(
-    x=grades_df,
-    orient="h",
-    palette="Greens",  # Use a palette for color
-    showmeans=True,
-    meanprops={
-        "marker": "D",  # Use a diamond shape for the mean
-        "markerfacecolor": "red",  # Highlight mean marker
-        "markeredgecolor": "black",
-        "markersize": "10",
-    },
-    linewidth=2.5,  # Thicker box lines
-    fliersize=5,  # Adjust outlier marker size
-)
+    # Create enhanced boxplot
+    plt.figure(figsize=(10, 6))  # Set figure size for better readability
+    ax = sns.boxplot(
+        x=grades_df,
+        orient="h",
+        palette="Greens",  # Use a palette for color
+        showmeans=True,
+        meanprops={
+            "marker": "D",  # Use a diamond shape for the mean
+            "markerfacecolor": "red",  # Highlight mean marker
+            "markeredgecolor": "black",
+            "markersize": "10",
+        },
+        linewidth=2.5,  # Thicker box lines
+        fliersize=5,  # Adjust outlier marker size
+    )
 
-# Add annotations for mean and median
-mean_val = grades_df.mean()
-median_val = grades_df.median()
-plt.text(mean_val, 0.5, f"Mean: {mean_val:.2f}", color="red", ha="center", va="center")
-plt.text(
-    median_val,
-    0.3,
-    f"Median: {median_val:.2f}",
-    color="blue",
-    ha="center",
-    va="center",
-)
+    # Add annotations for mean and median
+    mean_val = grades_df.mean()
+    median_val = grades_df.median()
+    plt.text(
+        mean_val, 0.5, f"Mean: {mean_val:.2f}", color="red", ha="center", va="center"
+    )
+    plt.text(
+        median_val,
+        0.3,
+        f"Median: {median_val:.2f}",
+        color="blue",
+        ha="center",
+        va="center",
+    )
 
-# Title and labels
-plt.title(f"Grades Distribution for {assignment_name}", fontsize=16)
-plt.xlabel("Grades", fontsize=14)
+    # Title and labels
+    plt.title(f"Grades Distribution for {assignment_name}", fontsize=16)
+    plt.xlabel("Grades", fontsize=14)
 
-# Display the plot
-st.pyplot(plt.gcf())
+    # Display the plot
+    st.pyplot(plt.gcf())
 
-# Clear the plot
-plt.clf()
+    # Clear the plot
+    plt.clf()
+
+    # Display the top mistakes.
+    top_mistakes = get_topComments(com_list)
+    logger.info(f"Top mistakes identified are:\n {top_mistakes}")
+    st.subheader("Most common feedback comments")
+    st.write(top_mistakes)
