@@ -131,9 +131,9 @@ if __name__ == "__main__":
             execution_time_seconds = end_time - start_time
             # Corrected calculation for average processing time per KB
             if total_size_kb > 0:
-                avg_time_per_kb = execution_time_seconds / total_size_kb
+                avg_speed_per_kb = total_size_kb / execution_time_seconds
                 logger.info(
-                    f"Methodology {methodology} average processing time: {avg_time_per_kb} seconds per KB."
+                    f"Methodology {methodology} average processing time: {avg_speed_per_kb} kb per second."
                 )
         else:
             logger.info(
