@@ -116,7 +116,7 @@ client = OpenAI()
             openai.Timeout,
         )
     ),
-    wait=wait_random_exponential(multiplier=2, max=60),
+    wait=wait_random_exponential(multiplier=4, max=60),
     stop=stop_after_attempt(10),
 )
 def get_completion(prompt):
@@ -136,6 +136,18 @@ def get_completion(prompt):
     return response_message
 
 
+@retry(
+    retry=retry_if_exception_type(
+        (
+            openai.APIError,
+            openai.APIConnectionError,
+            openai.RateLimitError,
+            openai.Timeout,
+        )
+    ),
+    wait=wait_random_exponential(multiplier=4, max=60),
+    stop=stop_after_attempt(10),
+)
 def get_completionCOT(sys_content, prompt):
     messages = [
         {
@@ -153,6 +165,18 @@ def get_completionCOT(sys_content, prompt):
     return response_message
 
 
+@retry(
+    retry=retry_if_exception_type(
+        (
+            openai.APIError,
+            openai.APIConnectionError,
+            openai.RateLimitError,
+            openai.Timeout,
+        )
+    ),
+    wait=wait_random_exponential(multiplier=4, max=60),
+    stop=stop_after_attempt(10),
+)
 def get_completionCOTMultiCalls(prompt):
     messages = [
         {
@@ -170,6 +194,18 @@ def get_completionCOTMultiCalls(prompt):
     return response_message
 
 
+@retry(
+    retry=retry_if_exception_type(
+        (
+            openai.APIError,
+            openai.APIConnectionError,
+            openai.RateLimitError,
+            openai.Timeout,
+        )
+    ),
+    wait=wait_random_exponential(multiplier=4, max=60),
+    stop=stop_after_attempt(10),
+)
 def get_completion_keywords(prompt2):
     messages = [
         {
@@ -187,6 +223,18 @@ def get_completion_keywords(prompt2):
     return response_message
 
 
+@retry(
+    retry=retry_if_exception_type(
+        (
+            openai.APIError,
+            openai.APIConnectionError,
+            openai.RateLimitError,
+            openai.Timeout,
+        )
+    ),
+    wait=wait_random_exponential(multiplier=4, max=60),
+    stop=stop_after_attempt(10),
+)
 def get_completionReAct(sys_content, prompt3):
     messages = [
         {
