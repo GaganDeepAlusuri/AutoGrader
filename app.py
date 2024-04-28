@@ -57,7 +57,7 @@ def apply_methodology(
             question_file_path,
             rubric_file_path,
         )
-    elif methodology == "M2":
+        #   elif methodology == "M2":
         logger.info(
             "###############################################################################___________Applying COT with RAG_______________############################################################"
         )
@@ -236,7 +236,7 @@ with st.sidebar:
     st.subheader("Assignment Details and Grading Methodology")
     assignment_name = st.text_input("Assignment Name")
     possible_points = st.number_input("Possible Points", min_value=0)
-    methodology_options = ["M1", "M2", "M3", "M4", "M5"]
+    methodology_options = ["M1", "M3", "M4", "M5"]
     methodology = st.selectbox(
         "Select Grading Methodology", options=methodology_options
     )
