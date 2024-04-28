@@ -215,7 +215,7 @@ def clean_comment(value):
         return value
 
 
-st.title("AutoGrader")
+st.title("GradePilot")
 
 # Define session state variables for storing file data if not already done
 if "gradebook_content" not in st.session_state:
