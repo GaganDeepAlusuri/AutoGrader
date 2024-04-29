@@ -141,20 +141,21 @@ def get_points_and_comments_using_GPT4(
 ):
     possible_points = float(possible_points)
 
-    grading_prompt = f"""Here are the grading guidelines:{grading_guidelines}\
-Follow the steps listed to grade the submission enclosed in triple back ticks. Now, evaluate the student's submission:\
-```{processed_file}```\
-Provide only a JSON output with 'points' and 'comments' as the keys in the response. 'comments' should be a string.
-""".strip()
+    grading_prompt = f"""Follow the listed steps which are enclosed in parenthesis to grade the student submission which is enclosed in triple back ticks.\n
+                        \nCompare each listed step to the corresponding part from the submission and evaluate it accordingly. Stick strictly to the steps for evaluation.\n
+                        steps: {grading_guidelines}\
+                        \nStudent submission: ```{processed_file}```\
+                        \nProvide only a JSON output with 'points' and 'comments' as the keys in the response. 'comments' should be a string.""".strip()
 
     try:
+        logger.info("Grading prompt is %s" % grading_prompt)
         response_message = get_completion(grading_prompt)
         json_match = re.search(r"\{.*\}", response_message, re.DOTALL)
         if json_match:
             json_str = json_match.group(0)
         else:
             logger.error(f"Response is: {json_str}")
-        logger.info(f"Response: {json_str}")
+        logger.info(f"Response after regex: {json_str}")
 
         # Assuming the response is well-structured JSON, parse it directly
         grading_info = GradingCommentReAct.parse_raw(json_str)
