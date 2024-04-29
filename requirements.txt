@@ -11,6 +11,6 @@ chromadb
 langchain-openai
 unstructured
 langchain-community
-"unstructured[md]"
+unstructured[md]
 streamlit
 seaborn
