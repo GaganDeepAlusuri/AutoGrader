@@ -8,6 +8,7 @@ torchvision --extra-index-url https://download.pytorch.org/whl/cu118
 torchaudio --extra-index-url https://download.pytorch.org/whl/cu118
 tenacity
 chromadb
+langchain
 langchain-openai
 unstructured
 langchain-community
