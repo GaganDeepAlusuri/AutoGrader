@@ -140,7 +140,7 @@ def finalize_grade(evaluation: dict, possible_points: int) -> dict:
     prompt_template = f"""
     Evaluation: {evaluation.json()}
     Total possible points: {possible_points}
-    Calculate the total grade and provide detailed feedback for each deduction. Provide a JSON output with keys 'points' and 'comments' with a string value.
+    Calculate the total grade and provide detailed feedback for each deduction. 
     Here are a few examples of the expected output:\
     {{
   "points": 8.5,
@@ -152,12 +152,13 @@ Example 2 JSON Output:
   "points": 7.5,
   "comments": "Your partially meets the requirements of the assignment. You successfully loaded the data, conducted a train/test split, and fitted both a Linear Regression and KNN model. However, there were several areas where the submission fell short. First, you did not provide a title or introduction for their analysis, resulting in a deduction of 0.5 points. Second, you did not discuss their selection of k value for the KNN model, resulting in a deduction of 1.0 points. Lastly, you did not recap their analysis or discuss the performance of the models using the RMSE metric, resulting in a deduction of 1.0 points. To improve, you should ensure they provide a clear introduction and conclusion for their analysis, and thoroughly discuss your model selection and performance evaluation process."
 }}
+Provide a JSON output with keys 'points' and 'comments' with a string value.
     """
     final_grade_response = get_completionCOTMultiCalls(prompt_template)
     cleaned_final_grade_response = final_grade_response.strip("`").replace("json\n", "")
-    json_match = re.search(r"\{.*\}", cleaned_final_grade_response, re.DOTALL)
+    json_match = re.search(r"^\{.*\}$", cleaned_final_grade_response, re.DOTALL)
     if json_match:
-        json_str = json_match.group(0)
+        json_str = json_match.group(0).strip()
         logger.info("Extracted JSON string: %s", json_str)
         return FinalGrade.parse_raw(json_str)
     else:
