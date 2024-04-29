@@ -6,7 +6,7 @@ import os
 import shutil
 from src.autograder.logging import logger
 from src.autograder.methodology import add_grades_and_comments
-from src.autograder.utils import process_submissions
+from src.autograder.utils import process_submissions, set_global_client
 from src.autograder.methodologyCOTRAG import (
     add_grades_and_comments_COTRAG,
     generate_data_store,
@@ -34,6 +34,26 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+from openai import OpenAI
+
+
+def verify_api_key(api_key):
+    client = OpenAI(api_key=api_key)
+    try:
+        # Attempt to create a completion or another minimal operation
+        response = client.completions.create(
+            model="gpt-3.5-turbo-instruct",  # Use an appropriate model identifier
+            prompt="test",  # Minimal prompt
+            max_tokens=1,
+        )
+        # If the call succeeds, the API key is valid
+        set_global_client(api_key)
+        return True
+    except Exception as e:
+        # Handle specific exceptions related to authentication failure
+        print(f"Failed to verify API key: {e}")
+        return False
 
 
 def apply_methodology(
@@ -114,6 +134,9 @@ com_list = list()
 
 
 def process_submissions_ui():
+    if not verify_api_key(api_key):
+        st.error("Invalid API Key provided. Please enter a valid API key.")
+        return  # Stop execution if the API key is invalid
     with st.spinner("Processing... Please wait."):
         with tempfile.TemporaryDirectory() as temp_dir:
             submissions_dir = os.path.join(temp_dir, "submissions")
@@ -240,13 +263,23 @@ with st.sidebar:
     methodology = st.selectbox(
         "Select Grading Methodology", options=methodology_options
     )
+    st.subheader("API Key")
+    api_key = st.text_input("Enter your OpenAI API Key", type="password")
 # Main Area: Question, Rubric, and Process Button
 question = st.text_area("Question", "Enter the question here...", height=200)
 rubric = st.text_area("Rubric", "Enter the rubric here...", height=300)
 
 # buttons
 if st.button("Process Submissions") and uploaded_files and uploaded_gradebook:
-    process_submissions_ui()
+    if verify_api_key(
+        api_key
+    ):  # Assuming verify_api_key returns True if the key is valid
+        process_submissions_ui()
+    else:
+        st.error(
+            "The API key provided is invalid. Please check your key and try again."
+        )
+
 
 # Display download buttons if content is available
 if st.session_state.get("gradebook_content"):

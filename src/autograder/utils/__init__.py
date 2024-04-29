@@ -5,6 +5,16 @@ import nbformat
 import re
 
 model = "gpt-3.5-turbo"
+# client = OpenAI()
+from openai import OpenAI
+
+global client
+client = None
+
+
+def set_global_client(api_key):
+    global client
+    client = OpenAI(api_key=api_key)
 
 
 class GradingComment(BaseModel):
@@ -103,8 +113,6 @@ from tenacity import (
 )
 import openai
 from openai import OpenAI
-
-client = OpenAI()
 
 
 @retry(
