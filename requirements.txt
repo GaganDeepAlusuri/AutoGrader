@@ -1,6 +1,6 @@
 nbformat
 pandas
-openai
+openai>=1.50.0
 python-dotenv
 transformers
 torch --extra-index-url https://download.pytorch.org/whl/cu118

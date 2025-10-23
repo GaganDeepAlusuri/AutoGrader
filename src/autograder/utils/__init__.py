@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import nbformat
 import re
 
-model = "gpt-3.5-turbo"
+# model = "gpt-3.5-turbo"  # Unused variable
 # client = OpenAI()
 from openai import OpenAI
 
@@ -127,7 +127,7 @@ from openai import OpenAI
     wait=wait_random_exponential(multiplier=4, max=60),
     stop=stop_after_attempt(10),
 )
-def get_completion(prompt):
+def get_completion(prompt, temperature=0, selected_model="gpt-3.5-turbo", reasoning_level=None):
     messages = [
         {
             "role": "system",
@@ -135,13 +135,37 @@ def get_completion(prompt):
         },
         {"role": "user", "content": prompt},
     ]
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=0,
-    )
-    response_message = response.choices[0].message.content
-    return response_message
+    
+    try:
+        # GPT-5 uses responses API with reasoning parameter (as per working test)
+        if selected_model == "gpt-5":
+            # Convert messages to input string for GPT-5
+            input_text = ""
+            for msg in messages:
+                if msg["role"] == "system":
+                    input_text += f"System: {msg['content']}\n\n"
+                elif msg["role"] == "user":
+                    input_text += f"User: {msg['content']}\n\n"
+            
+            api_params = {
+                "model": selected_model,
+                "input": input_text.strip(),
+                "reasoning": {"effort": reasoning_level},  # Use user selected reasoning level
+            }
+            
+            response = client.responses.create(**api_params)
+            response_message = response.output_text
+        else:
+            response = client.chat.completions.create(
+                model=selected_model,
+                messages=messages,
+                temperature=temperature,  
+            )
+            response_message = response.choices[0].message.content
+        return response_message
+    except Exception as e:
+        logger.error(f"API call failed for model {selected_model}: {e}")
+        raise
 
 
 @retry(
@@ -156,7 +180,7 @@ def get_completion(prompt):
     wait=wait_random_exponential(multiplier=4, max=60),
     stop=stop_after_attempt(10),
 )
-def get_completionCOT(sys_content, prompt):
+def get_completionCOT(sys_content, prompt, temperature=0, selected_model="gpt-3.5-turbo", reasoning_level=None):
     messages = [
         {
             "role": "system",
@@ -164,13 +188,38 @@ def get_completionCOT(sys_content, prompt):
         },
         {"role": "user", "content": prompt},
     ]
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=0,
-    )
-    response_message = response.choices[0].message.content
-    return response_message
+    
+    try:
+        if selected_model == "gpt-5":
+            # Convert messages to prompt string for GPT-5
+            prompt_text = ""
+            for msg in messages:
+                if msg["role"] == "system":
+                    prompt_text += f"System: {msg['content']}\n\n"
+                elif msg["role"] == "user":
+                    prompt_text += f"User: {msg['content']}\n\n"
+            
+            api_params = {
+                "model": selected_model,
+                "input": prompt_text.strip(),
+            }
+            # Add reasoning parameter if provided
+            if reasoning_level:
+                api_params["reasoning"] = {"effort": reasoning_level}
+            
+            response = client.responses.create(**api_params)
+            response_message = response.output_text
+        else:
+            response = client.chat.completions.create(
+                model=selected_model,
+                messages=messages,
+                temperature=temperature, 
+            )
+            response_message = response.choices[0].message.content
+        return response_message
+    except Exception as e:
+        logger.error(f"API call failed for model {selected_model}: {e}")
+        raise
 
 
 @retry(
@@ -185,7 +234,7 @@ def get_completionCOT(sys_content, prompt):
     wait=wait_random_exponential(multiplier=4, max=60),
     stop=stop_after_attempt(10),
 )
-def get_completionCOTMultiCalls(prompt):
+def get_completionCOTMultiCalls(prompt, temperature=0, selected_model="gpt-3.5-turbo", reasoning_level=None):
     messages = [
         {
             "role": "system",
@@ -193,13 +242,38 @@ def get_completionCOTMultiCalls(prompt):
         },
         {"role": "user", "content": prompt},
     ]
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=0,
-    )
-    response_message = response.choices[0].message.content
-    return response_message
+    
+    try:
+        if selected_model == "gpt-5":
+            # Convert messages to prompt string for GPT-5
+            prompt_text = ""
+            for msg in messages:
+                if msg["role"] == "system":
+                    prompt_text += f"System: {msg['content']}\n\n"
+                elif msg["role"] == "user":
+                    prompt_text += f"User: {msg['content']}\n\n"
+            
+            api_params = {
+                "model": selected_model,
+                "input": prompt_text.strip(),
+            }
+            # Add reasoning parameter if provided
+            if reasoning_level:
+                api_params["reasoning"] = {"effort": reasoning_level}
+            
+            response = client.responses.create(**api_params)
+            response_message = response.output_text
+        else:
+            response = client.chat.completions.create(
+                model=selected_model,
+                messages=messages,
+                temperature=temperature, 
+            )
+            response_message = response.choices[0].message.content
+        return response_message
+    except Exception as e:
+        logger.error(f"API call failed for model {selected_model}: {e}")
+        raise
 
 
 @retry(
@@ -214,7 +288,7 @@ def get_completionCOTMultiCalls(prompt):
     wait=wait_random_exponential(multiplier=4, max=60),
     stop=stop_after_attempt(10),
 )
-def get_completion_keywords(prompt2):
+def get_completion_keywords(prompt2, temperature=0, selected_model="gpt-3.5-turbo", reasoning_level=None):
     messages = [
         {
             "role": "system",
@@ -222,12 +296,32 @@ def get_completion_keywords(prompt2):
         },
         {"role": "user", "content": prompt2},
     ]
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=messages,
-        temperature=0,
-    )
-    response_message = response.choices[0].message.content
+    
+    # GPT-5 uses responses API with reasoning parameter (as per working test)
+    if selected_model == "gpt-5":
+        # Convert messages to input string for GPT-5
+        input_text = ""
+        for msg in messages:
+            if msg["role"] == "system":
+                input_text += f"System: {msg['content']}\n\n"
+            elif msg["role"] == "user":
+                input_text += f"User: {msg['content']}\n\n"
+        
+        api_params = {
+            "model": selected_model,
+            "input": input_text.strip(),
+            "reasoning": {"effort": reasoning_level},  # Use user selected reasoning level
+        }
+        
+        response = client.responses.create(**api_params)
+        response_message = response.output_text
+    else:
+        response = client.chat.completions.create(
+            model=selected_model,
+            messages=messages,
+            temperature=temperature,  
+        )
+        response_message = response.choices[0].message.content
     return response_message
 
 
@@ -243,7 +337,7 @@ def get_completion_keywords(prompt2):
     wait=wait_random_exponential(multiplier=4, max=60),
     stop=stop_after_attempt(10),
 )
-def get_completionReAct(sys_content, prompt3):
+def get_completionReAct(sys_content, prompt3, temperature=0, selected_model="gpt-3.5-turbo", reasoning_level=None):
     messages = [
         {
             "role": "system",
@@ -251,13 +345,38 @@ def get_completionReAct(sys_content, prompt3):
         },
         {"role": "user", "content": prompt3},
     ]
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=0,
-    )
-    response_message = response.choices[0].message.content
-    return response_message
+    
+    try:
+        if selected_model == "gpt-5":
+            # Convert messages to prompt string for GPT-5
+            prompt_text = ""
+            for msg in messages:
+                if msg["role"] == "system":
+                    prompt_text += f"System: {msg['content']}\n\n"
+                elif msg["role"] == "user":
+                    prompt_text += f"User: {msg['content']}\n\n"
+            
+            api_params = {
+                "model": selected_model,
+                "input": prompt_text.strip(),
+            }
+            # Add reasoning parameter if provided
+            if reasoning_level:
+                api_params["reasoning"] = {"effort": reasoning_level}
+            
+            response = client.responses.create(**api_params)
+            response_message = response.output_text
+        else:
+            response = client.chat.completions.create(
+                model=selected_model,
+                messages=messages,
+                temperature=temperature, 
+            )
+            response_message = response.choices[0].message.content
+        return response_message
+    except Exception as e:
+        logger.error(f"API call failed for model {selected_model}: {e}")
+        raise
 
 
 '''def get_topComments(comments):

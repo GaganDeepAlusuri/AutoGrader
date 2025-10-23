@@ -36,6 +36,9 @@ def add_grades_and_comments_ReAct(
     possible_points,
     question_file_path,
     rubric_file_path,
+    temperature=0,
+    selected_model="gpt-3.5-turbo",
+    reasoning_level=None,
 ):
     csv_file_path = find_csv_filename(directory_path)
     if not csv_file_path:
@@ -81,7 +84,7 @@ def add_grades_and_comments_ReAct(
         Here is the rubric: ```{rubric}```\
         How would you go about grading this assignment for a final grade and feedback for the student's submission? What steps would you take to achieve this?"""
     try:
-        grading_guidelines = get_completionReAct(prof, prompt_for_guidelines)
+        grading_guidelines = get_completionReAct(prof, prompt_for_guidelines, temperature, selected_model, reasoning_level)
         logger.info(f"Grading guidelines extracted:{grading_guidelines}")
     except Exception as e:
         logger.error(f"Failed to extract the grading guidelines: {e}")
@@ -100,6 +103,9 @@ def add_grades_and_comments_ReAct(
                 possible_points,
                 question,
                 grading_guidelines,
+                temperature,
+                selected_model,
+                reasoning_level,
             )
 
             data.at[index, assignment_name] = points
@@ -138,6 +144,9 @@ def get_points_and_comments_using_GPT4(
     possible_points,
     question,
     grading_guidelines,
+    temperature,
+    selected_model,
+    reasoning_level=None,
 ):
     possible_points = float(possible_points)
 
@@ -149,7 +158,7 @@ def get_points_and_comments_using_GPT4(
 
     try:
         logger.info("Grading prompt is %s" % grading_prompt)
-        response_message = get_completion(grading_prompt)
+        response_message = get_completion(grading_prompt, temperature, selected_model, reasoning_level)
         json_match = re.search(r"\{.*\}", response_message, re.DOTALL)
         if json_match:
             json_str = json_match.group(0)
@@ -158,7 +167,7 @@ def get_points_and_comments_using_GPT4(
         logger.info(f"Response after regex: {json_str}")
 
         # Assuming the response is well-structured JSON, parse it directly
-        grading_info = GradingCommentReAct.parse_raw(json_str)
+        grading_info = GradingCommentReAct.model_validate_json(json_str)
         return grading_info.points, grading_info.comments
     except Exception as e:
         logger.error(f"Error processing grading for student ID {sid}: {e}")

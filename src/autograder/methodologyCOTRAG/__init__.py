@@ -52,6 +52,11 @@ def add_grades_and_comments_COTRAG(
     possible_points,
     question_file_path,
     rubric_file_path,
+    temperature=0,
+    selected_model="gpt-3.5-turbo",
+    reasoning_level=None,
+    output_verbosity=None,
+    max_output_tokens=None,
 ):
     csv_file_path = find_csv_filename(directory_path)
     if not csv_file_path:
@@ -85,7 +90,7 @@ def add_grades_and_comments_COTRAG(
     data.insert(read_only_col_index, assignment_name, ["" for _ in range(len(data))])
 
     question = read_file_content(question_file_path)
-    keywords_from_question = get_completion_keywords(question)
+    keywords_from_question = get_completion_keywords(question, temperature, selected_model, reasoning_level)
     logger.info(f"Keywords from question: {keywords_from_question}")
     rubric = read_file_content(rubric_file_path)
 
@@ -109,6 +114,9 @@ def add_grades_and_comments_COTRAG(
                 question,
                 rubric,
                 keywords_from_question,
+                temperature,
+                selected_model,
+                reasoning_level,
             )
 
             data.at[index, assignment_name] = points
@@ -221,6 +229,11 @@ def get_points_and_comments_using_GPT4(
     question,
     rubric,
     keywords_from_question,
+    temperature,
+    selected_model,
+    reasoning_level=None,
+    output_verbosity=None,
+    max_output_tokens=None,
 ):
     # Query the vector store for relevant contexts based on the assignment question's keywords.
     relevant_contexts = query_vector_store(keywords_from_question, top_k=3)
@@ -263,11 +276,11 @@ Example 2 JSON Output:
 }}
 """.strip()
     try:
-        response_message = get_completionCOT(prompt_template, user_message)
+        response_message = get_completionCOT(prompt_template, user_message, temperature, selected_model, reasoning_level)
         logger.info(f"Response: {response_message}")
 
         # Assuming the response is well-structured JSON, parse it directly
-        grading_info = GradingCommentCOT.parse_raw(response_message)
+        grading_info = GradingCommentCOT.model_validate_json(response_message)
         return grading_info.points, grading_info.comments
     except Exception as e:
         logger.error(f"Error processing grading for student ID {sid}: {e}")

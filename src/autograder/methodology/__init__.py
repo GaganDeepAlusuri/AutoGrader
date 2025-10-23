@@ -4,8 +4,8 @@ import pandas as pd
 
 from src.autograder.logging import logger
 import re
-import random
-import numpy as np
+# import random  # Unused import
+# import numpy as np  # Unused import
 import os
 from dotenv import load_dotenv
 import json
@@ -34,6 +34,9 @@ def add_grades_and_comments(
     possible_points,
     question_file_path,
     rubric_file_path,
+    temperature=0,
+    selected_model="gpt-3.5-turbo",
+    reasoning_level=None,
 ):
     csv_file_path = find_csv_filename(directory_path)
     if not csv_file_path:
@@ -87,6 +90,9 @@ def add_grades_and_comments(
                 possible_points,
                 question,
                 rubric,
+                temperature,
+                selected_model,
+                reasoning_level,
             )
 
             data.at[index, assignment_name] = points
@@ -128,53 +134,62 @@ def get_points_and_comments_using_GPT4(
     possible_points,
     question,
     rubric,
+    temperature,
+    selected_model,
+    reasoning_level=None,
 ):
-
     possible_points = float(possible_points)
     prompt = f""" question:###{question}###,\
-                  Rubric: \"{rubric}\",
-                  Total points: {possible_points}, \
-                  ``SUBMISSION TO QUESTION ABOVE.``: ###{processed_file}###,
-                  ``Verify submission against rubric included in knowledge file prior to grading. Respond with a json output with keys points (consisting of final grade after deductions) and comments (A string for any deducted points and reason.).``
-                  """
+              Rubric: \"{rubric}\",
+              Total points: {possible_points}, \
+              ``SUBMISSION TO QUESTION ABOVE.``: ###{processed_file}###,
+              ``Verify submission against rubric included in knowledge file prior to grading. 
+              
+              IMPORTANT: Respond with ONLY a valid JSON object in this exact format:
+              {{
+                "points": <number>,
+                "comments": "<string>"
+              }}
+              
+              Do not include any other text, markdown formatting, or special characters.``
+              """
 
     try:
-        response_message = get_completion(prompt)
+        response_message = get_completion(prompt, temperature, selected_model, reasoning_level)
         cleaned_response_message = response_message.strip("`").replace("json\n", "")
+        
+        # Better JSON extraction with error handling
         json_match = re.search(r"\{.*\}", cleaned_response_message, re.DOTALL)
         if json_match:
             json_str = json_match.group(0)
             logger.info("Extracted JSON string: %s", json_str)
-            return GradingComment.parse_raw(json_str)
+            
+            # Clean the JSON string to remove control characters
+            import unicodedata
+            json_str = ''.join(char for char in json_str if unicodedata.category(char)[0] != 'C' or char in '\n\r\t')
+            
+            # Parse and validate
+            grading_info = GradingComment.model_validate_json(json_str)
+            return grading_info.points, grading_info.comments
         else:
             logger.error("No JSON found in the response.")
-
-        logger.info(response_message)
-
-        # Use Pydantic for parsing and validation
-        grading_info = GradingComment.parse_raw(response_message)
-
-        points = grading_info.points
-        # Handle comments being either a list or a dictionary
-        if isinstance(grading_info.comments, dict):
-            # Convert dictionary comments to a list of strings if needed
-            comments = [
-                f"{key}: {value}" for key, value in grading_info.comments.items()
-            ]
-        else:
-            # If it's already a list, use it directly
-            comments = grading_info.comments
+            return 0, ["No valid JSON found in response"]
 
     except ValidationError as e:
         logger.error(f"Validation error: {e} for student id: {sid}")
-        points, comments = 0, ["Validation error. Check the data structure."]
+        # Try to extract partial data if possible
+        try:
+            partial_data = json.loads(json_str)
+            points = partial_data.get('points', 0)
+            comments = partial_data.get('comments', 'Validation error - missing required fields')
+            return points, comments
+        except:
+            return 0, ["Validation error. Check the data structure."]
     except json.JSONDecodeError as e:
         logger.error(f"JSON decoding error: {e} for student id: {sid}")
-        points, comments = 0, [
-            "Failed to decode JSON. Check the response_message format."
-        ]
+        return 0, ["Failed to decode JSON. Check the response_message format."]
     except Exception as e:
         logger.error(f"Unexpected error: {e} for student id: {sid}")
-        points, comments = 0, ["An unexpected error occurred."]
+        return 0, ["An unexpected error occurred."]
 
     return points, comments

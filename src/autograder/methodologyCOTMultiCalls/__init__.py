@@ -36,7 +36,32 @@ class DeductionPlan(BaseModel):
     @classmethod
     def parse_deduction_plan(cls, json_str: str) -> "DeductionPlan":
         data = json.loads(json_str)
-        return cls(criteria=data)
+        # Handle the case where deduction might be a dict instead of float
+        processed_criteria = {}
+        for key, value in data.items():
+            if isinstance(value, dict):
+                if 'deduction' in value and isinstance(value['deduction'], dict):
+                    # If deduction is a dict, take the maximum value as the deduction
+                    deduction_values = [v for v in value['deduction'].values() if isinstance(v, (int, float))]
+                    deduction = max(deduction_values) if deduction_values else 0.0
+                else:
+                    deduction = value.get('deduction', 0.0)
+                    if isinstance(deduction, dict):
+                        deduction_values = [v for v in deduction.values() if isinstance(v, (int, float))]
+                        deduction = max(deduction_values) if deduction_values else 0.0
+                
+                processed_criteria[key] = {
+                    'description': value.get('description', ''),
+                    'deduction': float(deduction)
+                }
+            else:
+                # If the value is not a dict, create a default criterion
+                processed_criteria[key] = {
+                    'description': str(value),
+                    'deduction': 0.0
+                }
+        
+        return cls(criteria=processed_criteria)
 
 
 class EvaluationCriterion(BaseModel):
@@ -59,43 +84,68 @@ load_dotenv()
 
 
 def generate_deduction_plan(
-    question: str, rubric: str, possible_points: int
+    question: str, rubric: str, possible_points: int, temperature=0, selected_model="gpt-3.5-turbo", reasoning_level=None
 ) -> DeductionPlan:
     prompt_template = f"""
     Assignment question: {question}
     Total marks: {possible_points}
     Rubric: {rubric}
-    Understand the question and rubric, then create a deduction plan as described in the rubric.\
-    Provide only a JSON output with each criteria as the key with description and deduction inside. 
-    Here is an example of expected response:\
-   {{
-     "Train/Test Split": {{
-    "description": "They should use the train test split function",
-    "deduction": 0.5
-  }},
-  "Post-split Data Preprocessing": {{
-    "description": "It's very important that they do not fit the test data",
-    "deduction": 2.5
-  }},
-  "Measure Results": {{
-    "description": "The students should indicate the RMSE",
-    "deduction": 1.0
-  }}
-   }}
+    
+    Create a deduction plan based on the rubric. Each criterion should have a description and a single numeric deduction value.
+    
+    IMPORTANT: Respond with ONLY a valid JSON object. Each criterion must have exactly two fields:
+    - "description": a string describing the criterion
+    - "deduction": a single number (float) representing the maximum deduction for this criterion
+    
+    Example format:
+    {{
+      "Train/Test Split": {{
+        "description": "Students should use the train test split function",
+        "deduction": 0.5
+      }},
+      "Post-split Data Preprocessing": {{
+        "description": "Students should not fit the test data during preprocessing",
+        "deduction": 2.5
+      }},
+      "Measure Results": {{
+        "description": "Students should indicate the RMSE metric",
+        "deduction": 1.0
+      }}
+    }}
+    
+    Do not include any other text, markdown formatting, or nested objects in the deduction field.
     """
-    deduction_plan_response = get_completionCOTMultiCalls(prompt_template)
+    deduction_plan_response = get_completionCOTMultiCalls(prompt_template, temperature, selected_model, reasoning_level)
     json_match = re.search(r"\{.*\}", deduction_plan_response, re.DOTALL)
     if json_match:
         json_str = json_match.group(0)
         logger.info("Extracted JSON string: %s", json_str)
-        return DeductionPlan.parse_deduction_plan(json_str)
+        try:
+            return DeductionPlan.parse_deduction_plan(json_str)
+        except Exception as e:
+            logger.error(f"Error parsing deduction plan JSON: {e}")
+            logger.error(f"Raw JSON string that failed: {json_str}")
+            # Try to create a simple fallback deduction plan
+            try:
+                # Create a basic deduction plan with common criteria
+                fallback_data = {
+                    "General Requirements": {
+                        "description": "Basic assignment requirements",
+                        "deduction": 1.0
+                    }
+                }
+                return DeductionPlan.parse_deduction_plan(json.dumps(fallback_data))
+            except:
+                return DeductionPlan(criteria={})
     else:
         logger.error("No JSON found in the response.")
-        return None
+        logger.error(f"Raw response: {deduction_plan_response}")
+        # Return a default deduction plan
+        return DeductionPlan(criteria={})
 
 
 def evaluate_submission(
-    deduction_plan: DeductionPlan, submission: str
+    deduction_plan: DeductionPlan, submission: str, temperature=0, selected_model="gpt-3.5-turbo", reasoning_level=None
 ) -> SubmissionEvaluation:
     """
     Evaluates the submission against the rubric and deduction plan.
@@ -121,19 +171,33 @@ def evaluate_submission(
   "final_comments": "Overall, well done, but please ensure to only import what you use."
 }}
     """
-    evaluation_response = get_completionCOTMultiCalls(prompt_template)
+    evaluation_response = get_completionCOTMultiCalls(prompt_template, temperature, selected_model, reasoning_level)
 
     json_match = re.search(r"\{.*\}", evaluation_response, re.DOTALL)
     if json_match:
         json_str = json_match.group(0)
         logger.info("Extracted JSON string: %s", json_str)
-        return SubmissionEvaluation.parse_raw(json_str)
+        try:
+            return SubmissionEvaluation.model_validate_json(json_str)
+        except Exception as e:
+            logger.error(f"Error parsing evaluation JSON: {e}")
+            # Return a default evaluation
+            return SubmissionEvaluation(
+                evaluation={},
+                total_deduction=0.0,
+                final_comments="Error in evaluation parsing. Please check the submission manually."
+            )
     else:
         logger.error("No JSON found in the response.")
-        return None
+        # Return a default evaluation
+        return SubmissionEvaluation(
+            evaluation={},
+            total_deduction=0.0,
+            final_comments="Error in evaluation parsing. Please check the submission manually."
+        )
 
 
-def finalize_grade(evaluation: dict, possible_points: int) -> dict:
+def finalize_grade(evaluation: dict, possible_points: int, temperature=0, selected_model="gpt-3.5-turbo", reasoning_level=None) -> dict:
     """
     Calculates the final grade and provides detailed feedback.
     """
@@ -154,16 +218,28 @@ Example 2 JSON Output:
 }}
 Provide a JSON output with keys 'points' and 'comments' with a string value.
     """
-    final_grade_response = get_completionCOTMultiCalls(prompt_template)
+    final_grade_response = get_completionCOTMultiCalls(prompt_template, temperature, selected_model, reasoning_level)
     cleaned_final_grade_response = final_grade_response.strip("`").replace("json\n", "")
     json_match = re.search(r"^\{.*\}$", cleaned_final_grade_response, re.DOTALL)
     if json_match:
         json_str = json_match.group(0).strip()
         logger.info("Extracted JSON string: %s", json_str)
-        return FinalGrade.parse_raw(json_str)
+        try:
+            return FinalGrade.model_validate_json(json_str)
+        except Exception as e:
+            logger.error(f"Error parsing final grade JSON: {e}")
+            # Return a default grade
+            return FinalGrade(
+                points=0.0,
+                comments="Error in grade calculation. Please check the submission manually."
+            )
     else:
         logger.error("No JSON found in the response.")
-        return None
+        # Return a default grade
+        return FinalGrade(
+            points=0.0,
+            comments="Error in grade calculation. Please check the submission manually."
+        )
 
 
 def add_grades_and_comments_COTMultiCalls(
@@ -173,6 +249,9 @@ def add_grades_and_comments_COTMultiCalls(
     possible_points,
     question_file_path,
     rubric_file_path,
+    temperature=0,
+    selected_model="gpt-3.5-turbo",
+    reasoning_level=None,
 ):
     csv_file_path = find_csv_filename(directory_path)
     if not csv_file_path:
@@ -208,12 +287,25 @@ def add_grades_and_comments_COTMultiCalls(
     question = read_file_content(question_file_path)
     rubric = read_file_content(rubric_file_path)
     # Generate deduction plan
-    deduction_plan = generate_deduction_plan(question, rubric, possible_points)
+    logger.info("Generating deduction plan for M5 methodology...")
+    deduction_plan = generate_deduction_plan(question, rubric, possible_points, temperature, selected_model, reasoning_level)
+    logger.info(f"Deduction plan generated with {len(deduction_plan.criteria)} criteria")
     logger.info(f"Deduction plan: {deduction_plan.json()}")
 
     if question is None or rubric is None:
         logger.error("Failed to read question or rubric file.")
         return None
+    
+    # Check if deduction plan is valid
+    if not deduction_plan or not deduction_plan.criteria:
+        logger.warning("Deduction plan is empty or invalid. Proceeding with empty plan.")
+        # Create a minimal fallback deduction plan
+        deduction_plan = DeductionPlan(criteria={
+            "General Requirements": Criterion(
+                description="Basic assignment requirements",
+                deduction=1.0
+            )
+        })
     # rubric = generate_structured_rubric_with_chatgpt(rubric, possible_points)
     # logger.info(f"rubric summary: %s" % rubric)
 
@@ -231,6 +323,9 @@ def add_grades_and_comments_COTMultiCalls(
                 question,
                 rubric,
                 deduction_plan,
+                temperature,
+                selected_model,
+                reasoning_level,
             )
 
             data.at[index, assignment_name] = points
@@ -270,21 +365,37 @@ def get_points_and_comments_using_GPT4(
     question: str,
     rubric: str,
     deduction_plan: dict,
+    temperature: float,
+    selected_model: str,
+    reasoning_level=None,
 ):
     """
     Performs the multi-step grading process using separate LLM calls.
     """
 
     # Evaluate the submission based on the deduction plan
-    evaluation = evaluate_submission(deduction_plan, processed_file)
-    logger.info(f"Evaluation: {evaluation.json()}")
+    evaluation = evaluate_submission(deduction_plan, processed_file, temperature, selected_model, reasoning_level)
+    if evaluation:
+        logger.info(f"Evaluation: {evaluation.json()}")
+    else:
+        logger.error("Evaluation failed, using default values")
+        evaluation = SubmissionEvaluation(
+            evaluation={},
+            total_deduction=0.0,
+            final_comments="Evaluation failed. Please check manually."
+        )
 
     # Calculate the final grade and provide feedback
-    final_grade_and_comments = finalize_grade(evaluation, possible_points)
-    logger.info(f"Final grade and comments: {final_grade_and_comments.json()}")
+    final_grade_and_comments = finalize_grade(evaluation, possible_points, temperature, selected_model, reasoning_level)
+    if final_grade_and_comments:
+        logger.info(f"Final grade and comments: {final_grade_and_comments.json()}")
+        points = final_grade_and_comments.points
+        comments = final_grade_and_comments.comments
+    else:
+        logger.error("Final grade calculation failed, using default values")
+        points = 0.0
+        comments = "Grade calculation failed. Please check manually."
 
-    points = final_grade_and_comments.points
-    comments = final_grade_and_comments.comments
     logger.info(f"Final grade: {points} and comments: {comments}")
 
     return points, comments

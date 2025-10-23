@@ -48,6 +48,9 @@ def add_grades_and_comments_COT(
     possible_points,
     question_file_path,
     rubric_file_path,
+    temperature=0,
+    selected_model="gpt-3.5-turbo",
+    reasoning_level=None,
 ):
     csv_file_path = find_csv_filename(directory_path)
     if not csv_file_path:
@@ -102,6 +105,9 @@ def add_grades_and_comments_COT(
                 possible_points,
                 question,
                 rubric,
+                temperature,
+                selected_model,
+                reasoning_level,
             )
 
             data.at[index, assignment_name] = points
@@ -140,6 +146,9 @@ def get_points_and_comments_using_GPT4(
     possible_points,
     question,
     rubric,
+    temperature,
+    selected_model,
+    reasoning_level=None,
 ):
     user_message = f"Evaluate the student's submission and provide only a JSON output with points and comments:{processed_file}"
     # Construct the prompt for GPT-4 with the relevant contexts, assignment question, rubric, and the student's submission
@@ -172,11 +181,11 @@ Example 2 JSON Output:
 }}
 """.strip()
     try:
-        response_message = get_completionCOT(prompt_template, user_message)
+        response_message = get_completionCOT(prompt_template, user_message, temperature, selected_model, reasoning_level)
         logger.info(f"Response: {response_message}")
 
         # Assuming the response is well-structured JSON, parse it directly
-        grading_info = GradingCommentCOT.parse_raw(response_message)
+        grading_info = GradingCommentCOT.model_validate_json(response_message)
         return grading_info.points, grading_info.comments
     except Exception as e:
         logger.error(f"Error processing grading for student ID {sid}: {e}")
